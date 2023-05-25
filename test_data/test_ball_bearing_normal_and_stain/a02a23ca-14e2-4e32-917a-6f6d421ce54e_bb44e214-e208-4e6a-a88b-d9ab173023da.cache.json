@@ -1,0 +1,1 @@
+{"webAPIId":"bb44e214-e208-4e6a-a88b-d9ab173023da","imageUrl":"http://masgeo-service:9080/masgeo-api/uploads/temp/bb44e214-e208-4e6a-a88b-d9ab173023da/5972ca62-e316-4788-9fcd-e830c5b720d9.jpg","classified":[{"label":"ball_bearing_oil_stain","confidence":0.9882248044013977,"xmin":376,"ymin":500,"xmax":511,"ymax":612}],"result":"success","saveInferenceResults":null}

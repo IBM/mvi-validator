@@ -6,10 +6,10 @@
 
 
 
-## Setup
+## Setup （セットアップ）
 
-1. Install Python
-    Confirm that you can execute `python3` and `pip3` commands in terminal window.
+1. Pythonをインストールする。
+    コマンドラインから`python3`コマンドと`pip3`コマンドを実行できるか確認する
     
     ```sh
     $ python3 --version
@@ -19,34 +19,35 @@
     pip 22.3 from pip (python 3.11)
     ```
 
-3. Install
+3. インストール
     ```bash
     $ git clone git@github.com:IBM/mvi-validator.git
     $ cd mvi-validator
     $ pip3 install -e .
+    
     ```
     
-    Confirm that you can execute `mvi-validator` command in terminal window.
+    コマンドラインから`mvi-validator`コマンドを実行できるか確認する。
     ```sh
     $ mvi-validator --version
     0.0.3
     
-    # If you see "Command not found", use `python -m mvi-validator` instead of `mvi-validator`
+    # Command not found エラーが出る場合は、`mvi-validator` を `python -m mvi-validator` にすると動くかもしれません
     $ python -m mvi-validator --version
     0.0.3
     ```
 
 
 
-## Usage
+## Usage（使い方）
 
-1. MVI > left menu > dataset > select the test dataset you created > Click the right top export button ![image-20230118112342839](README.assets/image-20230118112342839.png) > Save the zip file on your PC
+1. MVI > 左メニュー > データセット > テスト用に作成したデータセットを選択 > 右上の エクスポートボタン![image-20230118112342839](README.assets/image-20230118112342839.png)をクリック > zipファイルをローカルPCに保存
     ![image-20230118112524488](README.assets/image-20230118112524488.png)
 
     
 
-2. Expand the zip file
-    - Example) if you expand in the directory `test_ball_bearing`, The dirctory structure looks like below.
+2. ダウンロードしたzipファイルを解凍する。
+    - 例) カレントディレクトリの下の`test_ball_bearing`ディレクトリに解凍したとすると、以下のようになる
         ```
         $ tree . | head
         .
@@ -64,24 +65,24 @@
     
     
     
-3. MVI  > left menu > Model >  select the model you want to verify > deploy
+3. MVI  > 左メニュー > モデル >  検証したいモデル > デプロイ
    
-4. MVI > left menu > deployed model > click `copy` button in API endpoint section
-    - Example) The URL copied from this button may be  `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` 
+4. MVI > 左メニュー > デプロイ済みモデル > デプロイ済みモデルのAPIエンドポイントの`コピー`をクリック
+    - 例) 以下のページでコピーしてきたURLは `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` になる
         ![image-20230118112109947](README.assets/image-20230118112109947.png)
 
     
 
-5. Open your terminal > execute  `mvi-validator deployed-model detection --api [API endpoint URL]  [The directory of test dataset]`
+5. ターミナルを起動し、`mvi-validator deployed-model detection --api [APIエンドポイントのURL]  [テストデータのディレクトリ]`を実行する。
    
    
-    1. Example)  If APIURL is  `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` , directory is  `test_ball_bearing` then
+    1. 例) 例えば、APIURLが `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` 、ディレクトリが `test_ball_bearing`の場合
         ```sh
         $ mvi-validator deployed-model detection --api https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da  test_ball_bearing
         ```
         <img src="README.assets/image-20230118114944241.png" alt="image-20230118114944241" style="zoom:50%;" />
     
-    2. The result will be shown in markdown table
+    2. 結果はデフォルトでマークダウンで表示される
         ```markdown
         # Summary
         |   num_images |   num_gt_bbox |   num_pd_bbox |   total_tp |   total_fp |   total_fn |   precision |   recall |   f-measure |      mAP | model_id                             |
@@ -91,8 +92,9 @@
     
         
         
-    3. If you use `--format csv` option with `mvi-validator` command, it generates CSV instead of markdown table.
-           ![image-20230118113736188](README.assets/image-20230118113736188.png)
+    3. エクセルで表示するとこんな感じ
+       ![image-20230118113736188](README.assets/image-20230118113736188.png)
+    
 
 
 
@@ -133,7 +135,7 @@ Takahide Nogayama
 
 
 
-## License
+## License（ライセンス）
 
 MIT
 
