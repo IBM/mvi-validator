@@ -138,4 +138,3 @@ Takahide Nogayama
 ## License（ライセンス）
 
 MIT
-
