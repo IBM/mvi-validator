@@ -10,7 +10,7 @@
 
 1. Install Python
     Confirm that you can execute `python3` and `pip3` commands in terminal window.
-    
+
     ```sh
     $ python3 --version
     Python 3.11.0
@@ -19,14 +19,33 @@
     pip 22.3 from pip (python 3.11)
     ```
 
-3. Install
+2. Install
+
+    1. Go [release page](https://github.com/IBM/mvi-validator/releases).
+
+    2. Download latest `tar.gz`file.
+
+    3. Expand the compressed file and go into the directory.
+
+        ```sh
+        $ tar zxvf mvi_validator-0.0.11.tar.gz
+        $ cd mvi_validator-0.0.11
+        ```
+
+    4. Install via pip
+        ```sh
+        $ pip install .	
+        ```
+
+3. Install (for developper)
     ```bash
     $ git clone git@github.com:IBM/mvi-validator.git
     $ cd mvi-validator
     $ pip3 install -e .
     ```
-    
-    Confirm that you can execute `mvi-validator` command in terminal window.
+
+
+4. Confirm that you can execute `mvi-validator` command in terminal window.
     ```sh
     $ mvi-validator --version
     0.0.3
