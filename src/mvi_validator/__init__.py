@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.10"
+__version__ = "0.0.11"
 
 import argparse
 from argparse import ArgumentParser, Action, Namespace
@@ -411,9 +411,26 @@ class ObjectDetectionStat(object):
 
         # stat.precision = stat.tp / (stat.tp + stat.fp)
         # stat.recall = stat.tp / (stat.tp + stat.fn)
-        self.precision = self.tp / len(self._pd_bboxes)
-        self.recall = self.tp / len(self._gt_bboxes)
-        self.fmeasure = 2 * self.precision * self.recall / (self.precision + self.recall)
+        if self.tp == 0:
+            self.precision = 0
+        elif len(self._pd_bboxes) > 0:
+            self.precision = self.tp / len(self._pd_bboxes)
+        else:
+            self.precision = -1
+
+        if self.tp == 0:
+            self.recall = 0
+        elif len(self._gt_bboxes) > 0:
+            self.recall = self.tp / len(self._gt_bboxes)
+        else:
+            self.recall = -1
+        
+        if self.precision == 0 and self.recall == 0:
+            self.fmeasure = 0
+        elif (self.precision + self.recall) > 0:
+            self.fmeasure = 2 * self.precision * self.recall / (self.precision + self.recall)
+        else:
+            self.fmeasure = -1
 
         self._calc_AP()
 
@@ -427,8 +444,18 @@ class ObjectDetectionStat(object):
             tmp_pd_bboxes.append(pd_bbox)
             tp: int = len([bbox for bbox in tmp_pd_bboxes if bbox.iou >= 0.5])
             fp: int = len([bbox for bbox in tmp_pd_bboxes if bbox.iou < 0.5])
-            precision: float = tp / (tp + fp)
-            recall: float = tp / len(self._gt_bboxes)
+            if tp == 0:
+                precision: float = 0
+            else:
+                precision: float = tp / (tp + fp)
+
+            if tp == 0:
+                recall = 0
+            elif len(self._gt_bboxes) > 0:
+                recall: float = tp / len(self._gt_bboxes)
+            else:
+                recall = -1
+            
             precisions.append(precision)
             recalls.append(recall)
 
