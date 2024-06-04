@@ -8,6 +8,8 @@
 
 ## Setup （セットアップ）
 
+
+
 1. Pythonをインストールする。
     コマンドラインから`python3`コマンドと`pip3`コマンドを実行できるか確認する
     
@@ -18,23 +20,26 @@
     $ pip3 --version 
     pip 22.3 from pip (python 3.11)
     ```
-
-3. インストール
-    ```bash
-    $ git clone git@github.com:IBM/mvi-validator.git
-    $ cd mvi-validator
-    $ pip3 install -e .
     
+    
+    
+2. インストール
+   
+    ```bash
+    pip install 'git+https://github.com/IBM/mvi-validator.git'
     ```
     
-    コマンドラインから`mvi-validator`コマンドを実行できるか確認する。
+    
+    
+3. コマンドラインから`mvi-validator`コマンドを実行できるか確認する。
+   
     ```sh
     $ mvi-validator --version
-    0.0.3
+    0.0.13
     
     # Command not found エラーが出る場合は、`mvi-validator` を `python -m mvi-validator` にすると動くかもしれません
     $ python -m mvi-validator --version
-    0.0.3
+    0.0.13
     ```
 
 
