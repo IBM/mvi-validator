@@ -37,7 +37,7 @@ LOG_FORMAT: str = '%(asctime)s |  %(levelname)-7s | %(message)s (%(filename)s L%
 INCLUSION_RATE_THREASHOLD = 0.5
 DEFAULT_NUM_OF_THREADS = 16
 DEFAULT_PRINT_FORMAT = "markdown"
-DEFAULT_SORT_KEYS=["label"]
+DEFAULT_SORT_KEYS = ["label"]
 
 ################################################################################
 # MVI BoundingBox
@@ -425,7 +425,7 @@ class ObjectDetectionStat(object):
             self.recall = self.tp / len(self._gt_bboxes)
         else:
             self.recall = -1
-        
+
         if self.precision == 0 and self.recall == 0:
             self.fmeasure = 0
         elif (self.precision + self.recall) > 0:
@@ -456,7 +456,7 @@ class ObjectDetectionStat(object):
                 recall: float = tp / len(self._gt_bboxes)
             else:
                 recall = -1
-            
+
             precisions.append(precision)
             recalls.append(recall)
 
@@ -581,7 +581,7 @@ def _sort_dataframe(df, df_name, sortkeys):
         else:
             sortkeys2.append(sortkey)
 
-    return df.sort_values(by = sortkeys2) 
+    return df.sort_values(by=sortkeys2)
 
 
 def cli_main__deployed_model__object_detection__measure_accuracy( \
