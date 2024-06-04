@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.11"
+__version__ = "0.0.12"
 
 import argparse
 from argparse import ArgumentParser, Action, Namespace
@@ -37,6 +37,7 @@ LOG_FORMAT: str = '%(asctime)s |  %(levelname)-7s | %(message)s (%(filename)s L%
 INCLUSION_RATE_THREASHOLD = 0.5
 DEFAULT_NUM_OF_THREADS = 16
 DEFAULT_PRINT_FORMAT = "markdown"
+DEFAULT_SORT_KEYS=["label"]
 
 ################################################################################
 # MVI BoundingBox
@@ -572,8 +573,19 @@ def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, a
     return summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df
 
 
+def _sort_dataframe(df, df_name, sortkeys):
+    sortkeys2 = []
+    for sortkey in sortkeys:
+        if sortkey not in df.dtypes:
+            _LOGGER.warning("The sortkey==%s is not inclued in data frame==%s. Just ignore it", sortkey, df_name)
+        else:
+            sortkeys2.append(sortkey)
+
+    return df.sort_values(by = sortkeys2) 
+
+
 def cli_main__deployed_model__object_detection__measure_accuracy( \
-    dataset_dir: str, api_url: str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, format=DEFAULT_PRINT_FORMAT, \
+    dataset_dir: str, api_url: str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, format=DEFAULT_PRINT_FORMAT, sortkeys=DEFAULT_SORT_KEYS, \
     output_tio=sys.stdout, print_summary=True, print_gt_bboxes=False, print_pd_bboxes=False, print_all=False) -> int:
     if print_all:
         print_summary = True
@@ -581,6 +593,12 @@ def cli_main__deployed_model__object_detection__measure_accuracy( \
         print_pd_bboxes = True
 
     summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df = main__deployed_model__object_detection__measure_accuracy(dataset_dir, api_url, ignore_cache, num_of_threads)
+
+    if sortkeys:
+        summary_df = _sort_dataframe(summary_df, 'summary_df', sortkeys)
+        label2summary_df = _sort_dataframe(label2summary_df, 'label2summary_df', sortkeys)
+        gt_bboxes_df = _sort_dataframe(gt_bboxes_df, 'gt_bboxes_df', sortkeys)
+        pd_bboxes_df = _sort_dataframe(pd_bboxes_df, 'pd_bboxes_df', sortkeys)
 
     if format.lower() in ("csv", "tsv"):
         sep: str = "\t" if format.lower() == "tsv" else ","
@@ -673,6 +691,7 @@ def _cli_main(*args: list[str]) -> int:
     mvi_validator__deployed_model__argparser.add_argument('--pd', "--print-pd-bbox", dest="print_pd_bboxes", action='store_true', default=False, help="Print predicted   bounding box table (default False)")
     mvi_validator__deployed_model__argparser.add_argument('--all', "--print-all", dest="print_all", action='store_true', default=False, help="Print all tables (default False)")
     mvi_validator__deployed_model__argparser.add_argument("--format", dest="format", metavar="md|markdown|csv|tsv", nargs=None, default=DEFAULT_PRINT_FORMAT, help=f"Print resutls as this format. (default: {DEFAULT_PRINT_FORMAT})")
+    mvi_validator__deployed_model__argparser.add_argument("--sortkey", dest="sortkeys", metavar="COLNAME", nargs='*', default=DEFAULT_SORT_KEYS, help=f"Sort the results by these keys. (default: {DEFAULT_SORT_KEYS})")
     mvi_validator__deployed_model__argparser.add_argument('--ignore-cache', dest="ignore_cache", action='store_true', default=False, help="Ignore inference cache with new result")
     mvi_validator__deployed_model__argparser.add_argument("--parallel", dest="num_of_threads", metavar="INT", nargs=None, type=int, default=DEFAULT_NUM_OF_THREADS, help="Run n jobs in parallel")
     mvi_validator__deployed_model__argparser.add_argument('--loglevel', dest="log_level", metavar="LEVEL", nargs=None, default=None, help=f"Log level either {_acceptable_levels}.")
