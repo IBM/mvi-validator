@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.12"
+__version__ = "0.0.13"
 
 import argparse
 from argparse import ArgumentParser, Action, Namespace
@@ -146,6 +146,46 @@ class BoundingBox(object):
 #     </object>
 # </annotation>
 
+# When polygons
+# <annotation>
+#     <size>
+#         <width>1086</width><height>1358</height><depth>3</depth>
+#     </size>
+#     <object>
+#         <_id>23d12044-e520-47bb-b978-c2c874aa21a1</_id>
+#         <name>donut</name>
+#         <bndbox>
+#             <xmin>476</xmin>
+#             <ymin>588</ymin>
+#             <xmax>784</xmax>
+#             <ymax>896</ymax>
+#         </bndbox>
+#         <generate_type>manual</generate_type>
+#         <file_id>0f2fbda5-daad-4786-9125-14d09553fbe2</file_id>
+#         <segment_polygons>
+#             <polygon>
+#                 <point><value>631</value><value>588</value></point>
+#                 <point><value>718</value><value>605</value></point>
+#                 <point><value>771</value><value>673</value></point>
+#                 <point><value>784</value><value>737</value></point>
+#                 <point><value>767</value><value>808</value></point>
+#                 <point><value>719</value><value>861</value></point>
+#                 <point><value>678</value><value>884</value></point>
+#                 <point><value>636</value><value>896</value></point>
+#                 <point><value>578</value><value>883</value></point>
+#                 <point><value>534</value><value>860</value></point>
+#                 <point><value>501</value><value>823</value></point>
+#                 <point><value>484</value><value>801</value></point>
+#                 <point><value>476</value><value>751</value></point>
+#                 <point><value>489</value><value>698</value></point>
+#                 <point><value>521</value><value>646</value></point>
+#                 <point><value>559</value><value>613</value></point>
+#                 <point><value>590</value><value>595</value></point>
+#             </polygon>
+#         </segment_polygons>
+#     </object>
+# </annotation>
+
 
 def load_image_metadata_from_xml(image_xml):
     gt_bboxes = []
@@ -158,6 +198,8 @@ def load_image_metadata_from_xml(image_xml):
         ymin = int(bndbox_elem.find("ymin").text)
         xmax = int(bndbox_elem.find("xmax").text)
         ymax = int(bndbox_elem.find("ymax").text)
+        if object_elem.find("segment_polygons"):
+            _LOGGER.warning("Using Bounding Box instead of Polygons for grandtruth annotation. The calculated values is not highly accurate.")
         gt_bboxes.append(BoundingBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, label=name))
     return gt_bboxes
 
@@ -214,6 +256,49 @@ def load_image_metadata_from_xml(image_xml):
 #     "result": "success"
 # }
 
+# When polygon
+# {
+#   "webAPIId": "2ace623e-31b6-4d8b-9d68-8f177e190c77",
+#   "imageUrl": "https://masgeo-service:9080/masgeo-api/uploads/temp/2ace623e-31b6-4d8b-9d68-8f177e190c77/bd37f4d8-1656-41af-ae01-02e1a1c76576.jpg",
+#   "classified": [
+#     {
+#       "label": "donut",
+#       "confidence": 0.9999771118164062,
+#       "xmin": 449,
+#       "ymin": 576,
+#       "xmax": 817,
+#       "ymax": 925,
+#       "polygons": [
+#           [
+#             [742,580],[741,581],[735,581],[734,582],[716,582],[715,583],[709,583],[708,584],[694,584],[693,585],
+#             [679,585],[678,586],[667,586],[666,587],[653,587],[652,588],[639,588],[638,589],[628,589],[627,590],
+#             [612,590],[611,591],[601,591],[600,592],[571,592],[570,591],[560,591],[559,590],[555,590],[554,589],
+#             [549,589],[548,588],[534,588],[533,587],[530,587],[529,586],[527,586],[526,585],[523,585],[522,584],
+#             [518,584],[517,585],[512,585],[511,586],[508,586],[507,587],[505,587],[504,588],[501,588],[500,589],
+#             [498,589],[497,590],[495,590],[494,591],[493,591],[492,592],[491,592],[490,593],[489,593],[486,596],
+#             [485,596],[484,597],[482,597],[481,598],[480,598],[479,599],[477,599],[476,600],[475,600],[474,601],
+#             [473,601],[471,603],[470,603],[469,604],[468,604],[467,605],[466,605],[465,606],[464,606],[456,614],
+#             [456,615],[455,616],[455,618],[454,619],[454,622],[453,623],[453,629],[452,630],[452,640],[451,641],
+#             [451,655],[452,656],[452,658],[451,659],[451,680],[452,681],[452,686],[451,687],[451,788],[450,789],
+#             [450,804],[451,805],[451,807],[450,808],[450,830],[451,831],[451,833],[450,834],[450,855],[451,856],
+#             [451,910],[452,911],[452,919],[456,923],[466,923],[467,924],[493,924],[494,925],[637,925],[638,924],
+#             [684,924],[685,923],[700,923],[701,922],[715,922],[716,921],[723,921],[724,920],[728,920],[729,919],
+#             [736,919],[737,920],[743,920],[744,921],[747,921],[748,920],[758,920],[759,919],[762,919],[764,917],
+#             [765,917],[769,913],[770,913],[771,912],[772,912],[774,910],[775,910],[776,909],[777,909],[779,907],
+#             [780,907],[781,906],[782,906],[783,905],[784,905],[785,904],[786,904],[787,903],[789,903],[790,902],
+#             [793,902],[794,901],[797,901],[798,900],[803,900],[804,899],[808,899],[809,898],[810,898],[811,897],
+#             [811,896],[812,895],[812,891],[813,890],[813,877],[814,876],[814,853],[815,852],[815,674],[814,673],
+#             [814,648],[815,647],[815,643],[814,642],[814,607],[813,606],[813,602],[812,601],[812,597],[811,596],
+#             [811,591],[810,590],[810,587],[809,586],[807,586],[806,585],[798,585],[797,584],[796,584],[795,583],
+#             [792,583],[791,582],[787,582],[786,581],[770,581],[769,580]
+#           ]
+#       ]
+#     }
+#   ],
+#   "result": "success",
+#   "saveInferenceResults": null
+# }
+
 
 def load_image_metadata_from_json(image_json):
     if isinstance(image_json, str):
@@ -227,6 +312,8 @@ def load_image_metadata_from_json(image_json):
         xmax = classified["xmax"]
         ymax = classified["ymax"]
         confidence = classified["confidence"]
+        if "polygons" in classified:
+            _LOGGER.warning("Using Bounding Box instead of Polygons for prediction. The calculated values is not highly accurate.")
         pd_bboxes.append(BoundingBox(xmin=xmin, ymin=ymin, xmax=xmax, ymax=ymax, label=label, confidence=confidence))
     return pd_bboxes
 

@@ -52,3 +52,13 @@ $ yapf --style='{column_limit: 9999}' -r  -i src
 $ rm -rf dist && python3 -m build
 ```
 
+
+
+# Release
+
+```sh
+VERSION="$(cat setup.cfg | grep version | cut -d ' ' -f 3)" && echo $VERSION
+
+gh release create v${VERSION} --generate-notes && gh release upload v${VERSION} dist/*
+```
+
