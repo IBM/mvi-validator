@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.13"
+__version__ = "0.0.14"
 
 import argparse
 from argparse import ArgumentParser, Action, Namespace
@@ -46,7 +46,18 @@ DEFAULT_SORT_KEYS = ["label"]
 class BoundingBox(object):
 
     def __init__(self, **entries):
+        self.label = None
+        self.iou: float = 0
+        self.confidence: float = 0
+        self.related_gt_bbox = None
+        self.related_pd_bbox = None
+
         self.__dict__.update(entries)
+
+        if self.xmin > self.xmax:
+            raise ValueError(f"xmin: {self.xmin} is greater than xmax: {self.xmax}")
+        if self.ymin > self.ymax:
+            raise ValueError(f"ymin: {self.ymin} is greater than ymax: {self.ymax}")
 
         self.width: int = self.xmax - self.xmin
         self.height: int = self.ymax - self.ymin
@@ -55,17 +66,16 @@ class BoundingBox(object):
         self.xcenter: float = self.xmin + (self.xmax - self.xmin) / 2
         self.ycenter: float = self.ymin + (self.ymax - self.ymin) / 2
 
-        self.iou: float
-        self.confidence: float
-        self.related_gt_bbox = None
-        self.related_pd_bbox = None
 
     def intersection(self, that):
         ret_xmin = self.xmin if self.xmin > that.xmin else that.xmin
         ret_ymin = self.ymin if self.ymin > that.ymin else that.ymin
         ret_xmax = self.xmax if self.xmax < that.xmax else that.xmax
         ret_ymax = self.ymax if self.ymax < that.ymax else that.ymax
-        return BoundingBox(xmin=ret_xmin, ymin=ret_ymin, xmax=ret_xmax, ymax=ret_ymax)
+        if ret_xmin > ret_xmax or ret_ymin > ret_ymax:
+            return BoundingBox(xmin=ret_xmin, ymin=ret_ymin, xmax=ret_xmin, ymax=ret_ymin, label=f"{self.label}&{that.label} (no intersection)")
+        
+        return BoundingBox(xmin=ret_xmin, ymin=ret_ymin, xmax=ret_xmax, ymax=ret_ymax, label=f"{self.label}&{that.label}")
 
     __and__ = intersection
 
@@ -81,6 +91,10 @@ class BoundingBox(object):
 
     def get_union_area(self, that):
         intersection = self & that
+        # _LOGGER.debug("self: %s", self)
+        # _LOGGER.debug("that: %s", that)
+        # _LOGGER.debug("intr: %s", intersection)
+        # _LOGGER.debug("union: %s", self.area + that.area - intersection.area)
         return self.area + that.area - intersection.area
 
     def __repr__(self):
@@ -354,7 +368,7 @@ class ImageInfo(object):
             else:
                 pd_bbox.iou = 0.0
 
-            _LOGGER.debug("Image:%s, pd_bbox object:   %s, iou: %s, confidence: %s, ", os.path.basename(self.image_file), pd_bbox.label, pd_bbox.iou, pd_bbox.confidence)
+            _LOGGER.debug("Image:%s, pd_bbox object:   %s, iou: %s, confidence: %s, max_intersection_area: %s, union_area: %s", os.path.basename(self.image_file), pd_bbox.label, pd_bbox.iou, pd_bbox.confidence, max_intersection_area, union_area)
 
         for gt_bbox in self.gt_bboxes:
 
