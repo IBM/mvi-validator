@@ -52,10 +52,14 @@ class InferenceClient(mvi_validator.AbcInferenceClient):
             ValueError: If the input image cannot be decoded.
             RuntimeError: If the inference process fails.
         """
-
+        
+        start_time = time.time()
+        # Do inference here
+        inference_sec = time.time() - start_time
+        
         result_json: Dict[str, Any] = {
             "result": "success",               # "success" or "fail"
-            "inference_sec": 1.23,             # float, inference execution time in seconds
+            "inference_sec": inference_sec,    # float, inference execution time in seconds
             "classified": [
                 {
                 "label": "dent",
