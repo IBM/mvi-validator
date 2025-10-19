@@ -12,6 +12,9 @@
 
 __version__ = "0.0.15"
 
+from typing import Dict, Any, override
+
+from abc import ABC, abstractmethod
 import argparse
 from argparse import ArgumentParser, Action, Namespace
 import concurrent.futures
@@ -21,11 +24,15 @@ import json
 import glob
 import logging
 import os
+from pathlib import Path
 import re
 import statistics
 import sys
 import time
 import xml.etree.ElementTree as ET
+
+import importlib.util
+import types
 
 import requests
 import pandas as pd
@@ -316,7 +323,6 @@ def load_image_metadata_from_xml(image_xml):
 
 # {"result":"fail","fault":"No token provided."}
 
-
 def load_image_metadata_from_json(image_json):
     if isinstance(image_json, str):
         image_json = json.loads(image_json)
@@ -471,8 +477,61 @@ def load_dataset(dataset_dir, load_to_memory=False):
 ################################################################################
 # Inference
 
+class AbcInferenceClient(ABC):
+    """
+    Abstract base class for an inference client that performs model inference directly from raw image bytes.
 
-class MviInferenceClient(object):
+    Implementations must define the `infer_bytes()` method, which accepts image data as bytes and
+    returns the inference results in a standardized dictionary format.
+
+    Expected return format:
+        {
+            "result": "success",               # "success" or "fail"
+            "inference_sec": 1.23,             # float, inference execution time in seconds
+            "classified": [
+                {
+                    "label": "donut",          # str, predicted class label
+                    "confidence": 0.999977,    # float, confidence score (0.0–1.0)
+                    "xmin": 449,               # int, bounding box top-left x coordinate
+                    "ymin": 576,               # int, bounding box top-left y coordinate
+                    "xmax": 817,               # int, bounding box bottom-right x coordinate
+                    "ymax": 925                # int, bounding box bottom-right y coordinate
+                },
+                ...
+            ]
+        }
+    """
+
+    def infer_file(self, filepath) -> dict:
+
+        image_bytes: list[bytes]
+        with io.open(filepath, 'rb') as image_bytes_reader:
+            image_bytes = image_bytes_reader.read()
+        return self.infer_bytes(image_bytes)
+
+    @abstractmethod
+    def id(self) -> str:
+        raise NotImplementedError()
+
+    @abstractmethod
+    def infer_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
+        """
+        Run inference on the given image bytes and return results
+        as a structured dictionary.
+
+        Args:
+            image_bytes (bytes): Raw image data to infer.
+
+        Returns:
+            dict: Inference result dictionary in the required format.
+
+        Raises:
+            ValueError: If the input image cannot be decoded.
+            RuntimeError: If the inference process fails.
+        """
+        raise NotImplementedError()
+
+class MviInferenceClient(AbcInferenceClient):
 
     def __init__(self, api_url: str, api_key: str):
         if not api_url:
@@ -486,24 +545,63 @@ class MviInferenceClient(object):
             raise ValueError("api_key is empty")
         self.api_key = api_key
 
-    def infer_file(self, filepath):
+    @override
+    def id(self):
+        return self.model_id
+    
+    @override
+    def infer_bytes(self, image_bytes) -> dict:
 
         headers: dict = {
            'X-Auth-Token': self.api_key
         }
-        image_bytes_reader = io.open(filepath, 'rb')
-        files = {'files': ['filename.jpg', image_bytes_reader.read(), 'image/jpeg']}
-        r = requests.post(self._api_url, headers=headers, files=files)
-        return r
+        files = {'files': ['filename.jpg', image_bytes, 'image/jpeg']}
+        reqeusts_result: requests.Response  = requests.post(self._api_url, headers=headers, files=files)
+        
+        result_json = reqeusts_result.json()
 
-    def infer_bytes(self, bytes):
-        headers: dict = {
-           'X-Auth-Token': self.api_key
-        }
-        files = {'files': ['filename.jpg', bytes, 'image/jpeg']}
-        r = requests.post(self._api_url, headers=headers, files=files)
-        return r
+        inference_sec: float = reqeusts_result.elapsed.total_seconds()
+        result_json["inference_sec"] = inference_sec
 
+        return result_json
+
+
+
+################################################################################
+# Dynamic python file load
+
+def _load_module_from_file(pyfile_path: str) -> types.ModuleType:
+    if not os.path.exists(pyfile_path):
+        raise FileNotFoundError(pyfile_path)
+    
+    pyfile = Path(pyfile_path)
+
+    module_name = f"mytool_user_modules.{pyfile.stem}"
+
+    spec = importlib.util.spec_from_file_location(module_name, pyfile)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Cannot create spec for {pyfile}")
+
+    module = importlib.util.module_from_spec(spec)
+    # 循環参照や相互 import 対応のため、先に登録
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+def load_class(pyfile_path: str, class_name: str = "InferenceClient") -> AbcInferenceClient:
+    module = _load_module_from_file(pyfile_path)
+
+    try:
+        inference_cls = getattr(module, class_name)
+    except AttributeError as e:
+        raise ImportError(f"Class {class_name!r} not found in {pyfile_path}. ") from e
+
+    # if not inspect.isclass(cls) or not issubclass(cls, ABCRunner):
+    #    raise TypeError(f"{class_name!r} is not a subclass of ABCRunner")
+
+    # # __init__(**kwargs) で依存注入できる形に
+    # instance = cls(**init_kwargs)  # type: ignore[call-arg]
+    return inference_cls
 
 ################################################################################
 # Accuracy Calcuration
@@ -549,8 +647,6 @@ class ObjectDetectionStat(object):
         self.fmeasure: float = 0
 
         self.AP: float = 0
-
-        self.inference_sec = 0
 
     def to_dict(self) -> dict:
         d: dict = vars(self)
@@ -660,7 +756,7 @@ def calc_accuracy_of_object_detection(dataset) -> list[ObjectDetectionStat, dict
 class ObjectDetectionStatCalculator(object):
 
     def __init__(self, mvi_client):
-        self.mvi_client: MviInferenceClient = mvi_client
+        self.mvi_client: AbcInferenceClient = mvi_client
 
     def infer(self, dataset: DataSet, ignore_cache=False, num_of_threads=DEFAULT_NUM_OF_THREADS):
 
@@ -669,19 +765,16 @@ class ObjectDetectionStatCalculator(object):
             _LOGGER.info("Infering image (%s/%s", idx, len(dataset.image_infos))
             done: bool = False
             if not ignore_cache:
-                json_file = image_info.image_stem + "_" + self.mvi_client.model_id + ".cache.json"
+                json_file = image_info.image_stem + "_" + self.mvi_client.id() + ".cache.json"
                 if os.path.exists(json_file):
                     result_json = json.load(io.open(json_file, "rt"))
                     done = True
             if not done:
                 _LOGGER.info("Sending inference request for %s", image_info.image_file)
                 if image_info.image_bytes is not None:
-                    reqeusts_result: requests.Response = self.mvi_client.infer_bytes(image_info.image_bytes)
+                    result_json = self.mvi_client.infer_bytes(image_info.image_bytes)
                 else:
-                    reqeusts_result: requests.Response = self.mvi_client.infer_file(image_info.image_file)
-                result_json = reqeusts_result.json()
-                inference_sec: float = reqeusts_result.elapsed.total_seconds()
-                result_json["inference_sec"] = inference_sec
+                    result_json = self.mvi_client.infer_file(image_info.image_file)
                 if not ignore_cache:
                     with io.open(json_file, "wt") as f:
                         f.write(json.dumps(result_json))
@@ -722,13 +815,18 @@ class ObjectDetectionStatCalculator(object):
 
 ################################################################################
 # MVI Validator main
-def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS) -> list[pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
+def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, inference_pyfile=None) -> list[pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
     
     dataset = load_dataset(dataset_dir, load_to_memory=ignore_cache)
 
-    mvi_client = MviInferenceClient(api_url, api_key)
+    inference_client: AbcInferenceClient
+    if inference_pyfile:
+        InferenceClient: AbcInferenceClient = load_class(inference_pyfile)
+        inference_client = InferenceClient()
+    else:
+        inference_client = MviInferenceClient(api_url, api_key)
 
-    stat_calculator = ObjectDetectionStatCalculator(mvi_client)
+    stat_calculator = ObjectDetectionStatCalculator(inference_client)
     stat_calculator.infer(dataset, ignore_cache=ignore_cache, num_of_threads=num_of_threads)
 
     ###############################
@@ -797,6 +895,7 @@ def _sort_dataframe(df, df_name, sortkeys):
 
 def cli_main__deployed_model__object_detection__measure_accuracy( \
     dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, format=DEFAULT_PRINT_FORMAT, sortkeys=DEFAULT_SORT_KEYS, \
+    inference_pyfile=None, \
     output_tio=sys.stdout, print_performance=True, print_summary=True, print_gt_bboxes=False, print_pd_bboxes=False, print_all=False) -> int:
 
     if not ignore_cache:
@@ -808,7 +907,7 @@ def cli_main__deployed_model__object_detection__measure_accuracy( \
         print_gt_bboxes = True
         print_pd_bboxes = True
 
-    summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df, performance_df = main__deployed_model__object_detection__measure_accuracy(dataset_dir, api_url, api_key, ignore_cache, num_of_threads)
+    summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df, performance_df = main__deployed_model__object_detection__measure_accuracy(dataset_dir, api_url, api_key, ignore_cache, num_of_threads, inference_pyfile)
 
     if sortkeys:
         summary_df = _sort_dataframe(summary_df, 'summary_df', sortkeys)
@@ -925,6 +1024,7 @@ def _cli_main(*args: list[str]) -> int:
     mvi_validator__deployed_model__argparser.add_argument('--ignore-cache', dest="ignore_cache", action='store_true', default=False, help="Ignore inference cache with new result")
     mvi_validator__deployed_model__argparser.add_argument("--parallel", dest="num_of_threads", metavar="INT", nargs=None, type=int, default=DEFAULT_NUM_OF_THREADS, help="Run n jobs in parallel")
     mvi_validator__deployed_model__argparser.add_argument('--loglevel', dest="log_level", metavar="LEVEL", nargs=None, default=None, help=f"Log level either {_acceptable_levels}.")
+    mvi_validator__deployed_model__argparser.add_argument("--inference_py", dest="inference_pyfile", metavar="PYTHONFILE", nargs=None, default=None, help="Python file contains implementation of InferenceClient class")
     mvi_validator__deployed_model__argparser.set_defaults(handler=cli_main__deployed_model__object_detection__measure_accuracy)
 
     arg_ns: Namespace = mvi_validator_argparser.parse_args(args)
