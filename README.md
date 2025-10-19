@@ -64,23 +64,47 @@
             ├── 005d5394-64ea-4d1f-a353-fac0fb5ebcb4.xml
         
         ```
+
     
-    
-    
+
 3. MVI  > left menu > Model >  select the model you want to verify > deploy
-   
-4. MVI > left menu > deployed model > click `copy` button in API endpoint section
+
+    
+
+4. MVI > left menu > `MVI Services` > `API Keys`, Copy
+    ![image-20251019145634285](README.assets/image-20251019145634285.png)
+
+    
+
+5. Set the api key to the environmental variable `APIKEY`
+
+    ```sh
+    export APIKEY=<API Key>
+    ```
+
+    
+
+6. MVI > left menu > deployed model > click `copy` button in API endpoint section
+
     - Example) The URL copied from this button may be  `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` 
         ![image-20230118112109947](README.assets/image-20230118112109947.png)
 
     
 
-5. Open your terminal > execute  `mvi-validator deployed-model detection --api [API endpoint URL]  [The directory of test dataset]`
-   
-   
+7. Set the endpoint url to the environmental variable `ENDPOINT`
+
+    ```sh
+    export ENDPOINT=<URL>
+    ```
+
+    
+
+8. Open your terminal > execute  `mvi-validator deployed-model detection --api [API endpoint URL]  [The directory of test dataset]`
+
+
     1. Example)  If APIURL is  `https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da` , directory is  `test_ball_bearing` then
         ```sh
-        $ mvi-validator deployed-model detection --api https://mvi.com/api/dlapis/bb44e214-e208-4e6a-a88b-d9ab173023da  test_ball_bearing
+        $ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} test_ball_bearing
         ```
         <img src="README.assets/image-20230118114944241.png" alt="image-20230118114944241" style="zoom:50%;" />
     
@@ -91,13 +115,61 @@
         |-------------:|--------------:|--------------:|-----------:|-----------:|-----------:|------------:|---------:|------------:|---------:|:-------------------------------------|
         |           28 |            27 |             9 |          8 |          1 |         19 |           1 | 0.185185 |    0.444444 | 0.888889 | bb44e214-e208-4e6a-a88b-d9ab173023da |
         ```
-    
-        
-        
+
+
+​        
+​        
     3. If you use `--format csv` option with `mvi-validator` command, it generates CSV instead of markdown table.
            ![image-20230118113736188](README.assets/image-20230118113736188.png)
 
 
+
+
+
+## Usage (Parallel execution)
+
+- By using `--parallel <NUM>` , inferences are done in parallel with`NUM` threads
+
+```sh
+$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} --parallel 8 test_ball_bearing
+```
+
+
+
+## Usage (Performance evaluation)
+
+- By using ` --ignore-cache`, local caching is disabled.
+
+- Also, performance data is shown in result.
+
+```sh
+$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT}  --ignore-cache test_ball_bearing
+```
+
+![image-20251019150641990](README.assets/image-20251019150641990.png)
+
+**About performance indicators **
+
+| Performance indicato                       | Description                                                |
+| :----------------------------------------- | :--------------------------------------------------------- |
+| Number of images                           | Number of inferences (number of image files)               |
+| Total inference time                       | Time seconds during whole processing.                      |
+| Througput                                  | Throughput (average inference numbers per 1 second)        |
+| Average Completion Interval (1/Throughput) | Average time duraiton per one inference (= 1 / throughput) |
+| Average inference time                     | Average inference time (seconds)                           |
+
+
+
+## Usage (Inference with custom code)
+
+When we want to use oss based inference, we can replace inference function by our custom code.
+
+- By using `--inference_py <PYTHON FILE>` , the custom inference function in the Python code is used instead of default one.
+- The custom Python file must include `InferenceClient` class that extends `mvi_validator.AbcInferenceClient`. See [sample code](samples/custom_inference.py).
+
+```sh
+$ mvi-validator deployed-model detection --inference_py my_custom.py test_ball_bearing
+```
 
 
 
@@ -140,3 +212,4 @@ Takahide Nogayama
 
 MIT
 
+​	
