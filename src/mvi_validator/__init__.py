@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.15"
+__version__ = "0.0.16"
 
 from typing import Dict, Any, override
 
@@ -989,7 +989,7 @@ def _cli_main(*args: list[str]) -> int:
     if not args:
         args = sys.argv[1:]
 
-    logging.basicConfig(stream=sys.stderr, format=LOG_FORMAT, level=logging.WARNING)
+    logging.basicConfig(stream=sys.stderr, format=LOG_FORMAT, level=logging.INFO)
 
     # "mvi-validator" command
     mvi_validator_argparser: ArgumentParser = argparse.ArgumentParser( \
