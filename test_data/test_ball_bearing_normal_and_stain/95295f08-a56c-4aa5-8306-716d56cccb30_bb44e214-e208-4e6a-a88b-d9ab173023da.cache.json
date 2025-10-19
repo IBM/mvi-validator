@@ -1,1 +1,0 @@
-{"webAPIId":"bb44e214-e208-4e6a-a88b-d9ab173023da","imageUrl":"http://masgeo-service:9080/masgeo-api/uploads/temp/bb44e214-e208-4e6a-a88b-d9ab173023da/cd12a3a3-a287-4628-a1b3-1d1e908e90b5.jpg","classified":[{"label":"ball_bearing","confidence":0.8055713176727295,"xmin":284,"ymin":424,"xmax":606,"ymax":692}],"result":"success","saveInferenceResults":null}
