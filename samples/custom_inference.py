@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from typing import Dict, Any, override
+import time
 
 import mvi_validator
 
@@ -31,10 +32,15 @@ class InferenceClient(mvi_validator.AbcInferenceClient):
     """
     def __init__(self):
         self._id = "LocalInferenceClient_001"
+        self._name = "LocalInferenceClient_001"
     
     @override
     def id(self) -> str:
         return self._id
+
+    @override
+    def name(self) -> str:
+        return self._name
 
     @override
     def infer_bytes(self, image_bytes: bytes) -> Dict[str, Any]:

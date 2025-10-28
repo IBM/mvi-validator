@@ -10,7 +10,7 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.16"
+__version__ = "0.0.17"
 
 from typing import Dict, Any, override
 
@@ -332,10 +332,7 @@ def load_image_metadata_from_json(image_json):
     
     result: str = image_json["result"]
     if result != "success":
-        fault: str = ""
-        if "fault" in image_json:
-            fault = f"fault: '{image_json["fault"]}'"
-        raise ValueError("Result attribute is not 'success': %s, %s" % (result, fault))
+        raise ValueError("Result attribute is not 'success': %s, %s" % (result, image_json))
 
     pd_bboxes = []
     for classified in image_json.get("classified", []):
@@ -426,7 +423,8 @@ class ImageInfo(object):
 
 class DataSet(object):
 
-    def __init__(self, image_infos=[]):
+    def __init__(self, name: str, image_infos=[]):
+        self.name=name
         self.image_infos = image_infos
         
         self.total_inference_time: float = -1
@@ -457,6 +455,8 @@ class DataSet(object):
 def load_dataset(dataset_dir, load_to_memory=False):
     if not os.path.exists(dataset_dir):
         raise FileNotFoundError(dataset_dir)
+    
+    dataset_dir_basename=os.path.basename(dataset_dir)
 
     image_infos = []
 
@@ -471,7 +471,7 @@ def load_dataset(dataset_dir, load_to_memory=False):
                 gt_bboxes = load_image_metadata_from_xml(image_xml)
             image_infos.append(ImageInfo(image_stem=image_stem, image_file=image_file, gt_bboxes=gt_bboxes, load_to_memory=load_to_memory))
 
-    return DataSet(image_infos)
+    return DataSet(name=dataset_dir_basename, image_infos=image_infos)
 
 
 ################################################################################
@@ -512,7 +512,11 @@ class AbcInferenceClient(ABC):
     @abstractmethod
     def id(self) -> str:
         raise NotImplementedError()
-
+    
+    @abstractmethod
+    def name(self) -> str:
+        raise NotImplementedError()
+    
     @abstractmethod
     def infer_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
         """
@@ -534,6 +538,9 @@ class AbcInferenceClient(ABC):
 class MviInferenceClient(AbcInferenceClient):
 
     def __init__(self, api_url: str, api_key: str):
+        """
+        api_url: e.g., https://abc.com/api/dlapis/216765f7-df83-4627-b4c8-f57f6647dc28
+        """
         if not api_url:
             raise ValueError("api_url is empty")
         self._api_url = api_url
@@ -544,6 +551,8 @@ class MviInferenceClient(AbcInferenceClient):
         if not api_key:
             raise ValueError("api_key is empty")
         self.api_key = api_key
+
+        self._name = None
 
     @override
     def id(self):
@@ -565,6 +574,55 @@ class MviInferenceClient(AbcInferenceClient):
 
         return result_json
 
+    def name(self):
+        if not self._name:
+            result = re.findall("^.*/api/", self._api_url)
+            api_endpoint = result[0]
+
+            url=api_endpoint + "webapis/" + self.model_id
+
+            headers: dict = {
+            'X-Auth-Token': self.api_key
+            }
+            reqeusts_result: requests.Response  = requests.get(url, headers=headers)
+            
+            result_json = reqeusts_result.json()
+            # returns
+            # {
+            #     "_id": "c7c9cb7f-31fa-45ae-9fb2-0dde7196e026",
+            #     "owner": "maspoc24122",
+            #     "usage": "cod",
+            #     "replicas": 1,
+            #     "name": "ball_bearing_normal_and_dent_4000_0.004_0.001",
+            #     "created_at": 1735216098868,
+            #     "userdnn_id": null,
+            #     "dnnscript_id": null,
+            #     "save_inference": null,
+            #     "accuracy": "1.0",
+            #     "categories": [
+            #         {
+            #             "category_id": "496c4755-86da-476b-bd79-4417c8ff0a56-ball_bearing",
+            #             "category_name": "ball_bearing"
+            #         },
+            #         {
+            #             "category_id": "496c4755-86da-476b-bd79-4417c8ff0a56-dent",
+            #             "category_name": "dent"
+            #         }
+            #     ],
+            #     "status": "ready",
+            #     "nn_arch": "yolo_v3",
+            #     "project_group_id": "2a64a7e1-6e9b-495e-a898-22828a5baaf6",
+            #     "project_group_name": "ball_bearing",
+            #     "production_status": "untested",
+            #     "version": "8.7.0",
+            #     "dataset_id": "",
+            #     "accel_type": "GPU",
+            #     "container_id": "9ac76e9e-e0a2-435d-a576-bb390458836f",
+            #     "shareable_container": "DLE",
+            #     "group_id": 101
+            # }
+            self._name =  result_json["name"]
+        return self._name
 
 
 ################################################################################
@@ -632,7 +690,10 @@ def _calc_AP(precisions: list[float], recalls: list[float]) -> float:
 
 class ObjectDetectionStat(object):
 
-    def __init__(self):
+    def __init__(self, dataset_name: str, model_name: str):
+        self.dataset=dataset_name
+        self.model=model_name
+
         self._gt_bboxes: list = []
         self._pd_bboxes: list = []
 
@@ -716,16 +777,16 @@ class ObjectDetectionStat(object):
         self.AP = _calc_AP(precisions, recalls)
 
 
-def calc_accuracy_of_object_detection(dataset) -> list[ObjectDetectionStat, dict]:
+def calc_accuracy_of_object_detection(dataset, model_name) -> list[ObjectDetectionStat, dict]:
 
     image_info: ImageInfo
     gt_bbox: BoundingBox
     pd_bbox: BoundingBox
 
-    all_stat: ObjectDetectionStat = ObjectDetectionStat()
+    all_stat: ObjectDetectionStat = ObjectDetectionStat(dataset.name, model_name)
 
     _LOGGER.info("Gathering bounding box groups by label")
-    label2stat = defaultdict(ObjectDetectionStat)
+    label2stat = defaultdict(lambda : ObjectDetectionStat(dataset.name, model_name))
     for image_info in dataset.image_infos:
         image_info.analyze_iou()
 
@@ -758,15 +819,16 @@ class ObjectDetectionStatCalculator(object):
     def __init__(self, mvi_client):
         self.mvi_client: AbcInferenceClient = mvi_client
 
-    def infer(self, dataset: DataSet, ignore_cache=False, num_of_threads=DEFAULT_NUM_OF_THREADS):
+    def infer(self, dataset: DataSet, ignore_cache=False, perf=False, num_of_threads=DEFAULT_NUM_OF_THREADS):
 
 
         def sample_func(idx: int, image_info: ImageInfo):
             _LOGGER.info("Infering image (%s/%s", idx, len(dataset.image_infos))
             done: bool = False
+            json_file = image_info.image_stem + "_" + self.mvi_client.id() + ".cache.json"
             if not ignore_cache:
-                json_file = image_info.image_stem + "_" + self.mvi_client.id() + ".cache.json"
                 if os.path.exists(json_file):
+                    _LOGGER.info("Loading cache json: %s", json_file)
                     result_json = json.load(io.open(json_file, "rt"))
                     done = True
             if not done:
@@ -775,7 +837,8 @@ class ObjectDetectionStatCalculator(object):
                     result_json = self.mvi_client.infer_bytes(image_info.image_bytes)
                 else:
                     result_json = self.mvi_client.infer_file(image_info.image_file)
-                if not ignore_cache:
+                if not perf:
+                    _LOGGER.info("Writing cache json: %s", json_file)
                     with io.open(json_file, "wt") as f:
                         f.write(json.dumps(result_json))
             image_info.result_json = result_json
@@ -805,8 +868,13 @@ class ObjectDetectionStatCalculator(object):
             for future in future_list:
                 future.result()
 
+        image_info: ImageInfo
         for idx, image_info in enumerate(dataset.image_infos):
-            pd_bboxes = load_image_metadata_from_json(image_info.result_json)
+            try:
+                pd_bboxes = load_image_metadata_from_json(image_info.result_json)
+            except Exception as e:
+                raise ValueError(f"Error with file={image_info.image_file}, {e}") from e
+            
             image_info.pd_bboxes = pd_bboxes
             image_info.inference_sec = image_info.result_json["inference_sec"]
 
@@ -815,9 +883,9 @@ class ObjectDetectionStatCalculator(object):
 
 ################################################################################
 # MVI Validator main
-def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, inference_pyfile=None) -> list[pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
+def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, perf=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, inference_pyfile=None) -> list[pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
     
-    dataset = load_dataset(dataset_dir, load_to_memory=ignore_cache)
+    dataset = load_dataset(dataset_dir, load_to_memory=perf)
 
     inference_client: AbcInferenceClient
     if inference_pyfile:
@@ -827,11 +895,11 @@ def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, a
         inference_client = MviInferenceClient(api_url, api_key)
 
     stat_calculator = ObjectDetectionStatCalculator(inference_client)
-    stat_calculator.infer(dataset, ignore_cache=ignore_cache, num_of_threads=num_of_threads)
+    stat_calculator.infer(dataset, ignore_cache=ignore_cache, perf=perf, num_of_threads=num_of_threads)
 
     ###############################
     # calculate accuracies
-    all_stat, label2stat = calc_accuracy_of_object_detection(dataset)
+    all_stat, label2stat = calc_accuracy_of_object_detection(dataset, model_name=inference_client.name())
     # all_stat["model_id"] = mvi_client.model_id
 
     # data frame for summary
@@ -872,6 +940,9 @@ def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, a
     _LOGGER.info("Average inference time: %s", dataset.average_inference_time)
 
     performance_df: pd.DataFrame = pd.DataFrame([{
+        "dataset": dataset.name,
+        "model": inference_client.name(),
+        "#Threads": num_of_threads,
         "Number of images": len(dataset.image_infos),
         "Total inference time": dataset.total_inference_time,
         "Througput": dataset.throughput,
@@ -894,11 +965,11 @@ def _sort_dataframe(df, df_name, sortkeys):
 
 
 def cli_main__deployed_model__object_detection__measure_accuracy( \
-    dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, format=DEFAULT_PRINT_FORMAT, sortkeys=DEFAULT_SORT_KEYS, \
+    dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, perf=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, format=DEFAULT_PRINT_FORMAT, sortkeys=DEFAULT_SORT_KEYS, \
     inference_pyfile=None, \
     output_tio=sys.stdout, print_performance=True, print_summary=True, print_gt_bboxes=False, print_pd_bboxes=False, print_all=False) -> int:
 
-    if not ignore_cache:
+    if not perf:
         print_performance = False
     
     if print_all:
@@ -907,7 +978,7 @@ def cli_main__deployed_model__object_detection__measure_accuracy( \
         print_gt_bboxes = True
         print_pd_bboxes = True
 
-    summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df, performance_df = main__deployed_model__object_detection__measure_accuracy(dataset_dir, api_url, api_key, ignore_cache, num_of_threads, inference_pyfile)
+    summary_df, label2summary_df, gt_bboxes_df, pd_bboxes_df, performance_df = main__deployed_model__object_detection__measure_accuracy(dataset_dir, api_url, api_key, ignore_cache, perf, num_of_threads, inference_pyfile)
 
     if sortkeys:
         summary_df = _sort_dataframe(summary_df, 'summary_df', sortkeys)
@@ -1022,6 +1093,7 @@ def _cli_main(*args: list[str]) -> int:
     mvi_validator__deployed_model__argparser.add_argument("--format", dest="format", metavar="md|markdown|csv|tsv", nargs=None, default=DEFAULT_PRINT_FORMAT, help=f"Print resutls as this format. (default: {DEFAULT_PRINT_FORMAT})")
     mvi_validator__deployed_model__argparser.add_argument("--sortkey", dest="sortkeys", metavar="COLNAME", nargs='*', default=DEFAULT_SORT_KEYS, help=f"Sort the results by these keys. (default: {DEFAULT_SORT_KEYS})")
     mvi_validator__deployed_model__argparser.add_argument('--ignore-cache', dest="ignore_cache", action='store_true', default=False, help="Ignore inference cache with new result")
+    mvi_validator__deployed_model__argparser.add_argument('--perf', dest="perf", action='store_true', default=False, help="Measure performance metrics")
     mvi_validator__deployed_model__argparser.add_argument("--parallel", dest="num_of_threads", metavar="INT", nargs=None, type=int, default=DEFAULT_NUM_OF_THREADS, help="Run n jobs in parallel")
     mvi_validator__deployed_model__argparser.add_argument('--loglevel', dest="log_level", metavar="LEVEL", nargs=None, default=None, help=f"Log level either {_acceptable_levels}.")
     mvi_validator__deployed_model__argparser.add_argument("--inference_py", dest="inference_pyfile", metavar="PYTHONFILE", nargs=None, default=None, help="Python file contains implementation of InferenceClient class")
