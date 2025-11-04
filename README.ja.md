@@ -138,12 +138,12 @@ $ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} --
 
 ## Usage (性能測定)
 
-- ` --ignore-cache` を指定することで、キャッシュが無効となり、必ず推論が実行される。
+- ` --ignore-cache` と `--perf` を指定することで、キャッシュが無効となり、必ず推論が実行される。
 
 - また、性能が測定され性能の数値が表示される
 
 ```sh
-$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT}  --ignore-cache test_ball_bearing
+$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} --parallel <NUM> --ignore-cache --perf  test_ball_bearing
 ```
 
 ![image-20251019150641990](README.assets/image-20251019150641990.png)

@@ -138,12 +138,12 @@ $ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} --
 
 ## Usage (Performance evaluation)
 
-- By using ` --ignore-cache`, local caching is disabled.
+- By using ` --ignore-cache` and `--perf`, local caching is disabled.
 
 - Also, performance data is shown in result.
 
 ```sh
-$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT}  --ignore-cache test_ball_bearing
+$ mvi-validator deployed-model detection --apikey ${APIKEY} --api ${ENDPOINT} --parallel <NUM> --ignore-cache --perf test_ball_bearing
 ```
 
 ![image-20251019150641990](README.assets/image-20251019150641990.png)
