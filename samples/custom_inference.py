@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from typing import Dict, Any, override
+from typing import Dict, Any, override, Union
 import time
 
 import mvi_validator
@@ -34,6 +34,12 @@ class InferenceClient(mvi_validator.AbcInferenceClient):
         self._id = "LocalInferenceClient_001"
         self._name = "LocalInferenceClient_001"
     
+    # If you want to load image from cv2, please comment out the following code.
+    # def load_file(self, filepath: str) -> Any:
+    #     #with io.open(filepath , 'rb') as image_bytes_reader:
+    #     #        return image_bytes_reader.read()
+    #     return cv2.imread(filepath)
+        
     @override
     def id(self) -> str:
         return self._id
@@ -43,7 +49,7 @@ class InferenceClient(mvi_validator.AbcInferenceClient):
         return self._name
 
     @override
-    def infer_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
+    def infer_bytes(self, image_bytes: Union[bytes, Any]) -> Dict[str, Any]:
         """
         Run inference on the given image bytes and return results
         as a structured dictionary.
@@ -68,7 +74,7 @@ class InferenceClient(mvi_validator.AbcInferenceClient):
             "inference_sec": inference_sec,    # float, inference execution time in seconds
             "classified": [
                 {
-                "label": "dent",
+                "label": "fobject",
                 "confidence": 0.9999735355377197,
                 "xmin": 610,
                 "ymin": 1425,

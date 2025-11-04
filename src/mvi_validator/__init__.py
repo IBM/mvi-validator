@@ -10,9 +10,9 @@
 # http://opensource.org/licenses/mit-license.php
 # =================================================================
 
-__version__ = "0.0.17"
+__version__ = "0.0.18"
 
-from typing import Dict, Any, override
+from typing import Dict, Any, override, Union
 
 from abc import ABC, abstractmethod
 import argparse
@@ -353,24 +353,22 @@ def load_image_metadata_from_json(image_json):
 
 class ImageInfo(object):
 
-    def __init__(self, image_stem, image_file, gt_bboxes=[], pd_bboxes=[], load_to_memory=False):
+    def __init__(self, image_stem, image_file, gt_bboxes=[], pd_bboxes=[]):
         self.image_stem = image_stem
         self.image_file = image_file
         self.gt_bboxes = gt_bboxes
         self.pd_bboxes = pd_bboxes
         self.inference_sec = -1;
-        self.image_bytes: list[bytes] = None
+
+        self.image_bytes: Union[bytes, Any] = None
         
         self.result_json = None
-
-        if load_to_memory:
-            with io.open(self.image_file , 'rb') as image_bytes_reader:
-                self.image_bytes = image_bytes_reader.read()
 
     def __repr__(self):
         return f"ImageInfo(image_file={self.image_file}, gt_bboxes={self.gt_bboxes}, pd_bboxes={self.pd_bboxes}, inference_sec={self.inference_sec})"
 
     def analyze_iou(self):
+        union_area: BoundingBox = None
 
         for pd_bbox in self.pd_bboxes:
 
@@ -384,7 +382,7 @@ class ImageInfo(object):
                     or intersection.area > max_intersection_area:
                         max_overlapped_gt_bbox = gt_bbox
                         max_intersection_area = intersection.area
-
+            
             if max_overlapped_gt_bbox:
                 union_area = pd_bbox.get_union_area(max_overlapped_gt_bbox)
                 pd_bbox.iou = max_intersection_area / union_area
@@ -452,7 +450,7 @@ class DataSet(object):
         
         self.average_inference_time = total_inference_sec / len(self.image_infos)
 
-def load_dataset(dataset_dir, load_to_memory=False):
+def load_dataset(dataset_dir):
     if not os.path.exists(dataset_dir):
         raise FileNotFoundError(dataset_dir)
     
@@ -469,7 +467,7 @@ def load_dataset(dataset_dir, load_to_memory=False):
             gt_bboxes = []
             if os.path.exists(image_xml):
                 gt_bboxes = load_image_metadata_from_xml(image_xml)
-            image_infos.append(ImageInfo(image_stem=image_stem, image_file=image_file, gt_bboxes=gt_bboxes, load_to_memory=load_to_memory))
+            image_infos.append(ImageInfo(image_stem=image_stem, image_file=image_file, gt_bboxes=gt_bboxes))
 
     return DataSet(name=dataset_dir_basename, image_infos=image_infos)
 
@@ -502,11 +500,16 @@ class AbcInferenceClient(ABC):
         }
     """
 
-    def infer_file(self, filepath) -> dict:
+    def load_file(self, filepath: str) -> Any:
 
-        image_bytes: list[bytes]
-        with io.open(filepath, 'rb') as image_bytes_reader:
-            image_bytes = image_bytes_reader.read()
+        with io.open(filepath , 'rb') as image_bytes_reader:
+            return image_bytes_reader.read()
+        
+        # or
+        # return cv2.imread(filepath)
+
+    def infer_file(self, filepath: str) -> dict:
+        image_bytes: list[bytes] = self.fload_file(filepath)
         return self.infer_bytes(image_bytes)
 
     @abstractmethod
@@ -516,9 +519,9 @@ class AbcInferenceClient(ABC):
     @abstractmethod
     def name(self) -> str:
         raise NotImplementedError()
-    
+
     @abstractmethod
-    def infer_bytes(self, image_bytes: bytes) -> Dict[str, Any]:
+    def infer_bytes(self, image_bytes: Union[bytes, Any]) -> Dict[str, Any]:
         """
         Run inference on the given image bytes and return results
         as a structured dictionary.
@@ -559,7 +562,7 @@ class MviInferenceClient(AbcInferenceClient):
         return self.model_id
     
     @override
-    def infer_bytes(self, image_bytes) -> dict:
+    def infer_bytes(self, image_bytes: bytes) -> dict:
 
         headers: dict = {
            'X-Auth-Token': self.api_key
@@ -574,6 +577,7 @@ class MviInferenceClient(AbcInferenceClient):
 
         return result_json
 
+    @override
     def name(self):
         if not self._name:
             result = re.findall("^.*/api/", self._api_url)
@@ -821,7 +825,9 @@ class ObjectDetectionStatCalculator(object):
 
     def infer(self, dataset: DataSet, ignore_cache=False, perf=False, num_of_threads=DEFAULT_NUM_OF_THREADS):
 
-
+        for idx, image_info in enumerate(dataset.image_infos):
+            image_info.image_bytes = self.mvi_client.load_file(image_info.image_file)
+        
         def sample_func(idx: int, image_info: ImageInfo):
             _LOGGER.info("Infering image (%s/%s", idx, len(dataset.image_infos))
             done: bool = False
@@ -885,7 +891,7 @@ class ObjectDetectionStatCalculator(object):
 # MVI Validator main
 def main__deployed_model__object_detection__measure_accuracy(dataset_dir: str, api_url: str, api_key:str, ignore_cache=False, perf=False, num_of_threads: int = DEFAULT_NUM_OF_THREADS, inference_pyfile=None) -> list[pd.DataFrame, dict, pd.DataFrame, pd.DataFrame]:
     
-    dataset = load_dataset(dataset_dir, load_to_memory=perf)
+    dataset = load_dataset(dataset_dir)
 
     inference_client: AbcInferenceClient
     if inference_pyfile:
